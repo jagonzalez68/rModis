@@ -3,7 +3,6 @@
 #install.packages('gdalUtils', repos="http://cran.rstudio.com/")
 #install.packages("MODIS", repos="http://R-Forge.R-project.org",type="source")
 
-library(knitr)
 library(raster)
 library(rgdal)
 library(gdalUtils)
@@ -11,9 +10,14 @@ library(RCurl)
 
 Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
 
-MRTPath <- "/Users/jagonzalez/MRT/bin"      # Ruta de binarios del MRT
-DATPath <- "/Users/jagonzalez/MRT/data/hdf" # Ruta donde se almacenan los archivos hdf
-PARPath <- "/Users/jagonzalez/MRT/par"      # Ruta donde guardamos el archivo de parámetros
+# Ruta de binarios del MRT
+MRTPath <- "/Users/jagonzalez/MRT/bin"
+# Ruta donde se almacenan los archivos hdf
+DATPath <- "/Users/jagonzalez/MRT/data/hdf"
+# Ruta donde guardamos el archivo de parámetros
+PARPath <- "/Users/jagonzalez/MRT/par"
+# Ruta de archivos de salida del script
+OUTPath <- "/Users/jagonzalez/MRT/out"
 
 # Cambiamos al directorio de trabajo, donde se encuentran
 # los archivos de datos de entrada ".hdf"
@@ -124,11 +128,13 @@ evis <- list.files(TIFPath, pattern = "*_EVI.tif")
 
 # Creando estructura para NDVI's
 # Para cada archivo NDVI descargado
+ndviOUTPath <- paste(OUTPath, "NDVI", sep="/")
+system(paste("mkdir ", ndviOUTPath, sep=""))
 for(i in seq(1:length(ndvs)))
 {
   # Obtenemos el nombre del archivo
   ndviDay <- paste("DOY_", substr(ndvs[i], 14, nchar(ndvs[i]) - 22), sep="")
-  mvDir <- file.path(OUTPath, ndviDay)
+  mvDir <- file.path(ndviOUTPath, ndviDay)
   mvNam <- file.path(TIFPath, ndvs[i])
   # Si no se ha creado, creamos el directorio DOY_###
   dir.create(mvDir, showWarnings = FALSE)
@@ -138,11 +144,13 @@ for(i in seq(1:length(ndvs)))
 
 # Creando estructura para EVI's
 # Para cada archivo EVI descargado
+eviOUTPath <- paste(OUTPath, "EVI", sep="/")
+system(paste("mkdir ", eviOUTPath, sep=""))
 for(i in seq(1:length(evis)))
 {
   # Obtenemos el nombre del archivo
   eviDay <- paste("DOY_", substr(evis[i], 14, nchar(evis[i]) - 21), sep="")
-  mvDir <- file.path(OUTPath, eviDay)
+  mvDir <- file.path(eviOUTPath, eviDay)
   mvNam <- file.path(TIFPath, evis[i])
   # Si no se ha creado, creamos el directorio DOY_###
   dir.create(mvDir, showWarnings = FALSE)

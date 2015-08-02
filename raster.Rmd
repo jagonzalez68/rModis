@@ -188,17 +188,24 @@ system(comando3)
 
 # Crear Directorios para cálculo de índice CVI
 ```{r}
+# Ahora creamos la estructura de archivos para procesar
+# y calcular el respectivo CVI
+# Los archivos .tif quedaron guardados en PARPath
 TIFPath <- PARPath
 setwd(TIFPath)
+# Obteniendo nombres de archivos NDVI y EVI
 ndvs <- list.files(TIFPath, pattern = "*_NDVI.tif")
 evis <- list.files(TIFPath, pattern = "*_EVI.tif")
 
+# Creando estructura para NDVI's
 # Para cada archivo NDVI descargado
+ndviOUTPath <- paste(OUTPath, "NDVI", sep="/")
+system(paste("mkdir ", ndviOUTPath, sep=""))
 for(i in seq(1:length(ndvs)))
 {
   # Obtenemos el nombre del archivo
   ndviDay <- paste("DOY_", substr(ndvs[i], 14, nchar(ndvs[i]) - 22), sep="")
-  mvDir <- file.path(OUTPath, ndviDay)
+  mvDir <- file.path(ndviOUTPath, ndviDay)
   mvNam <- file.path(TIFPath, ndvs[i])
   # Si no se ha creado, creamos el directorio DOY_###
   dir.create(mvDir, showWarnings = FALSE)
@@ -206,6 +213,21 @@ for(i in seq(1:length(ndvs)))
   system(comando5)
 }
 
+# Creando estructura para EVI's
+# Para cada archivo EVI descargado
+eviOUTPath <- paste(OUTPath, "EVI", sep="/")
+system(paste("mkdir ", eviOUTPath, sep=""))
+for(i in seq(1:length(evis)))
+{
+  # Obtenemos el nombre del archivo
+  eviDay <- paste("DOY_", substr(evis[i], 14, nchar(evis[i]) - 21), sep="")
+  mvDir <- file.path(eviOUTPath, eviDay)
+  mvNam <- file.path(TIFPath, evis[i])
+  # Si no se ha creado, creamos el directorio DOY_###
+  dir.create(mvDir, showWarnings = FALSE)
+  comando5 <- paste("cp", mvNam, mvDir, sep=" ")
+  system(comando5)
+}
 ```
 # Calcular CVI
 
