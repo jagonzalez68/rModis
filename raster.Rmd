@@ -5,7 +5,7 @@ date: "29 de julio de 2015"
 output: pdf_document
 ---
 
-En este tutorial mostramos el uso del lenguaje de programación R para procesar datos espaciales.
+En este tutorial mostramos el uso del lenguaje de programación R para procesar datos espaciales, en particular, imágenes MODIS.
 
 # Pasos Iniciales
 
@@ -58,16 +58,25 @@ Antes de ejecutar el siguiente código necesitamos recolectar la siguiente infor
 # Definimos la variable de ambiente MRT_DATA_DIR
 Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
 
-MRTPath <- "/Users/jagonzalez/MRT/bin"
-DATPath <- "/Users/jagonzalez/MRT/data/hdf"
-PARPath <- "/Users/jagonzalez/MRT/par"
+MRTPath <- "/Users/jagonzalez/MRT/bin"      # Ruta de binarios del MRT
+DATPath <- "/Users/jagonzalez/MRT/data/hdf" # Ruta donde se almacenan los archivos hdf
+PARPath <- "/Users/jagonzalez/MRT/par"      # Ruta donde guardamos el archivo de parámetros
 
-# Cambiamos al directorio de trabajo
+# Cambiamos al directorio de trabajo, donde se encuentran
+# los archivos de datos de entrada ".hdf"
 setwd(DATPath)
+
+# Obtenemos en filePath la ruta a un archivo hdf para usar en 
+# el archivo de parámetros
 files <- list.files(pattern="*.hdf")
 fileName <- files[1]
 filePath <- paste(DATPath, fileName, sep = "/")
 
+# Creación del archivo de parámetros inicial
+# Si queremos trabajar con un recorte de la imagen original cambiamos:
+#     - SPATIAL_SUBSET_UL_CORNER
+#     - SPATIAL_SUBSET_LR_CORNER
+# a manera que el bounding box contenga nuestro recorte
 parFile <- vector(mode = "character")
 parFile[1] <- ""
 parFile[2] <- paste("INPUT_FILENAME = ", filePath, sep = "")
@@ -114,29 +123,46 @@ parFile[21] <- " 0.0 0.0 0.0"
 parFile[22] <- " 0.0 0.0 0.0 )"
 parFile[23] <- ""
 parFile[24] <- "DATUM = WGS84"
+
+# Almacenamiento del Archivo de parámetros
 parFileName <- paste(PARPath, "parameter.par", sep = "/")
-#file.create(fileName)
 fileC <- file(parFileName, 'w')
 for(i in seq(1:length(parFile)))
 {
   cat(parFile[i], "\n", file = fileC, sep="")
 }
 close(fileC)
+# Termina creación del archivo de parámetros inicial
+
 
 # Creamos el comando para preparar la re-proyección:
+# Se crea el script mrtbatch
 comando1 <- paste("java -jar ", MRTPath, "/", "MRTBatch.jar -d ", DATPath, " -p ", parFileName, " -o ", PARPath, sep = "")
 system(comando1)
+
+# Comando para agregar permisos de ejecución al
+# script mrtbatch
 curDir <- getwd()
 batchName <- paste(curDir,"mrtbatch", sep="/")
 comando2 <- paste("chmod 755 ", batchName, sep="")
 system(comando2)
-comando3 <- paste(curDir,"mrtbatch", sep="/")
+
+# Comando para convertir el archivo de parámetros .par 
+# de formato mac antiguo a formato unix
 system(paste("dos2unix -c mac ", batchName, sep=""))
+
+# Comando para convertir los archivos de parámetros .prm
+# de formato mac antiguo a formato unix
 allParFiles <- paste(PARPath, "*.prm", sep = "/")
 system(paste("dos2unix -c mac ", allParFiles, sep = ""))
+
+# Comando para ejecutar el script mrtbatch
+comando3 <- paste(curDir,"mrtbatch", sep="/")
 system(comando3)
 
 
-# Obtener un Recorte para la Colección de Imágenes
+# Crear Directorios para cálculo de índice CVI
+
+# Calcular CVI
 
 
