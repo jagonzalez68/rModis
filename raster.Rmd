@@ -59,7 +59,7 @@ Antes de ejecutar el siguiente código necesitamos recolectar la siguiente infor
 Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
 
 MRTPath <- "/Users/jagonzalez/MRT/bin"
-DATPath <- "/Users/jagonzalez/MRT/data"
+DATPath <- "/Users/jagonzalez/MRT/data/hdf"
 PARPath <- "/Users/jagonzalez/MRT/par"
 
 # Cambiamos al directorio de trabajo
@@ -95,8 +95,8 @@ southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
 southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
 southC  <- gsub(" ", "", southC)
 
-parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, sep = " ")
-parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, sep = " ")
+parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, ")", sep = " ")
+parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, ")", sep = " ")
 parFile[10] <- ""
 fileName <- substr(fileName, 1, nchar(i) - 4)
 fileName <- paste(fileName, "tif", sep=".")
@@ -116,17 +116,26 @@ parFile[23] <- ""
 parFile[24] <- "DATUM = WGS84"
 parFileName <- paste(PARPath, "parameter.par", sep = "/")
 #file.create(fileName)
-#fileConn <- file(fileName)
-sink(parFileName)
+fileC <- file(parFileName, 'w')
 for(i in seq(1:length(parFile)))
 {
-  cat(parFile[i])
-  cat("\n")
+  cat(parFile[i], "\n", file = fileC, sep="")
 }
-sink()
+close(fileC)
 
 # Creamos el comando para preparar la re-proyección:
-commando1 <- paste("java -jar ", MRTPath, "/", "MRTBatch.jar -d ", DATPath, "-p ", parFileName, "-o ", PARPath)
+comando1 <- paste("java -jar ", MRTPath, "/", "MRTBatch.jar -d ", DATPath, " -p ", parFileName, " -o ", PARPath, sep = "")
+system(comando1)
+curDir <- getwd()
+batchName <- paste(curDir,"mrtbatch", sep="/")
+comando2 <- paste("chmod 755 ", batchName, sep="")
+system(comando2)
+comando3 <- paste(curDir,"mrtbatch", sep="/")
+system(paste("dos2unix -c mac ", batchName, sep=""))
+allParFiles <- paste(PARPath, "*.prm", sep = "/")
+system(paste("dos2unix -c mac ", allParFiles, sep = ""))
+system(comando3)
+
 
 # Obtener un Recorte para la Colección de Imágenes
 
