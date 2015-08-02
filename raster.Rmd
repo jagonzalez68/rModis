@@ -1,0 +1,204 @@
+---
+title: "R for Geospatial Data"
+author: "Jesus A. Gonzalez"
+date: "29 de julio de 2015"
+output: pdf_document
+---
+
+En este tutorial mostramos el uso del lenguaje de programación R para procesar datos espaciales.
+
+# Pasos Iniciales
+
+Lo primero que debemos hacer es instalar las siguientes librerías que nos permitirán trabajar con datos espaciales, incluyendo imágenes. La instalación de estos paquetes solo se hará la primera vez que trabajemos con este tipo de datos.
+
+```{r}
+#install.packages('raster', repos="http://cran.rstudio.com/")
+#install.packages('rgdal', repos="http://cran.rstudio.com/")
+#install.packages('gdalUtils', repos="http://cran.rstudio.com/")
+#install.packages("MODIS", repos="http://R-Forge.R-project.org",type="source")
+```
+
+Posteriormente, cargaremos las librerías para poder utilizarlas en nuestro programa con los siguientes comandos:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(raster)
+library(rgdal)
+library(gdalUtils)
+library(RCurl)
+library(MODIS)
+```
+
+# Instalación de la Herramienta MRT
+
+La herramienta MODIS Reprojection Tool (MRT) se utiliza para manipular las imágenes MODIS. El código de este tutorial utiliza funciones de MRT y debe descargarse e instalarse. MRT se puede obtener de la siguiente página web: https://lpdaac.usgs.gov/tools/modis_reprojection_tool
+
+# Descarga y Reproyección de Imágenes MODIS
+
+Ahora descargaremos las imágenes MODIS y las reproyectaremos. Los programas que necesitamos son:
+- ModisDownload.R y ModisLP.rdata
+
+Estos archivos los podemos descargar de la página: http://r-gis.net/?q=ModisDownload
+
+Antes de ejecutar el siguiente código necesitamos recolectar la siguiente información:
+- Ruta del directorio de archivos ejecutables de la herramienta MRT
+  - /Users/jagonzalez/MRT/bin
+- Ruta del directorio de datos de la herramienta MRT
+  - /Users/jagonzalez/MRT/data
+- El nombre del producto MODIS que descargaremos
+  - MOD13Q1
+- La posición h/v de los bloques de las imágenes con las que trabajaremos. Para el caso de centroamérica utilizamos:
+  - h = 9
+  - v = 7
+- El rango de fechas para nuestra serie de tiempo de imágenes
+  - inicial = AAAA.MM.DD
+  - final = AAAA.MM.DD
+  
+```{r}
+# Definimos rutas del ambiente
+# Definimos la variable de ambiente MRT_DATA_DIR
+Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
+
+MRTPath <- "/Users/jagonzalez/MRT/bin"
+DATPath <- "/Users/jagonzalez/MRT/data"
+PARPath <- "/Users/jagonzalez/MRT/par"
+
+# Cambiamos al directorio de trabajo
+setwd(DATPath)
+files <- list.files(pattern="*.hdf")
+fileName <- files[1]
+filePath <- paste(DATPath, fileName, sep = "/")
+
+parFile <- vector(mode = "character")
+parFile[1] <- ""
+parFile[2] <- paste("INPUT_FILENAME = ", filePath, sep = "")
+parFile[3] <- ""
+parFile[4] <- "SPECTRAL_SUBSET = ( 1 1 0 0 0 0 0 0 0 0 0 0 )"
+parFile[5] <- ""
+parFile[6] <- "SPATIAL_SUBSET_TYPE = INPUT_LAT_LONG"
+parFile[7] <- ""
+
+hdinfo <- gdalinfo(filePath, raw_output = TRUE)
+
+northC <- hdinfo[grep("NORTHBOUNDINGCOORDINATE", hdinfo)]
+northC <- gsub("NORTHBOUNDINGCOORDINATE=", "", northC)
+northC <- gsub(" ", "", northC)
+
+eastC  <- hdinfo[grep("EASTBOUNDINGCOORDINATE=", hdinfo)]
+eastC  <- gsub("EASTBOUNDINGCOORDINATE=", "", eastC)
+eastC  <- gsub(" ", "", eastC)
+
+westC  <- hdinfo[grep("WESTBOUNDINGCOORDINATE=", hdinfo)]
+westC  <- gsub("WESTBOUNDINGCOORDINATE=", "", westC)
+westC  <- gsub(" ", "", westC)
+
+southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
+southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
+southC  <- gsub(" ", "", southC)
+
+parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, sep = " ")
+parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, sep = " ")
+parFile[10] <- ""
+fileName <- substr(fileName, 1, nchar(i) - 4)
+fileName <- paste(fileName, "tif", sep=".")
+parFile[11] <- paste("OUTPUT_FILENAME = ", fileName, sep = "" )
+parFile[12] <- ""
+parFile[13] <- "RESAMPLING_TYPE = NEAREST_NEIGHBOR"
+parFile[14] <- ""
+parFile[15] <- "OUTPUT_PROJECTION_TYPE = GEO"
+parFile[16] <- ""
+parFile[17] <- "OUTPUT_PROJECTION_PARAMETERS = ("
+parFile[18] <- " 0.0 0.0 0.0"
+parFile[19] <- " 0.0 0.0 0.0"
+parFile[20] <- " 0.0 0.0 0.0"
+parFile[21] <- " 0.0 0.0 0.0"
+parFile[22] <- " 0.0 0.0 0.0 )"
+parFile[23] <- ""
+parFile[24] <- "DATUM = WGS84"
+
+MODISoptions(localArcPath = "/Library/Frameworks/GDAL.framework/Programs/")
+
+# Especificamos el directorio de trabajo, en el que descargamos
+# el script ModisDownload.R
+
+
+
+
+# Cargamos el programa ModisDownload.R
+source("ModisDownload.R")
+
+
+# Descargamos las imágenes. Para esto debemos especificar los parámetros:
+# h en h=c(_______)
+# v en v=c(_______)
+# rango de fechas en dates=c('AAAA.MM.DD', 'AAAA.MM.DD')
+ModisDownload(x="MOD13Q1", h=c(9), v=c(7), 
+              dates=c('2015.05.01', '2015.05.21'), 
+              mosaic=F, proj=F,  pixel_size=250)
+
+# Obtenemos la lista de archivos ".hdf" descargados en hdf.files
+files <- list.files()
+hdf.files <- files[grep(".hdf", files, fixed=T)]
+
+# Para cada archivo ".hdf", llamamos a la rutina de reproyección del MRT
+for(i in hdf.files)
+  {
+  
+    # En "j" obtenemos el nombre del archivo de salida para la reproyección
+    j <- substr(i, 1, nchar(i) - 4)
+    j <- paste(j, "tif", sep=".")
+    hdfName <- i
+    filename <- j
+    
+    # Llamamos la función de reproyección. Para esto necesitamos especificar
+    # los parámetros:
+    # MRTPath, en este caso: "/Users/jagonzalez/MRT/bin"
+    # Para nuestro ejemplo no requerimos cambiar otro parámetro
+    reprojectHDF(hdfName,filename,"/Users/jagonzalez/MRT/bin", 
+                 bands_subset="1 1 0 0 0 0 0 0 0 0 0 0",
+                 resample_type="NEAREST_NEIGHBOR",
+                 proj_type="GEO", 
+                 proj_params="-3 0 0 0 0 0 0 0 0 0 0 0 0 0 0", 
+                 datum='WGS84')
+}
+
+#-111.6969   -99.9917  -10.0000   -0.0000
+ModisDownload(x="MOD13Q1", h=c(9), v=c(7), 
+              MRTpath="/Users/jagonzalez/MRT/bin",
+              dates=c('2015.05.01', '2015.05.21'),
+              mosaic=F, proj=T,
+              UL=c(19.9999999982039,-95.7759995131384),
+              LR=c(9.99999999910196,-81.2256670549084),
+              bands_subset="1 1 0 0 0 0 0 0 0 0 0 0",
+              proj_type="GEO",
+              proj_params="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+              datum="WGS84",  pixel_size=250)
+
+```
+
+
+# Obtener un Recorte para la Colección de Imágenes
+
+
+```{r}
+# Definiendo las coordenadas para el recorte
+xmin <- "13.924579"
+xmax <- "13.920378"
+ymin <- "-84.543547"
+ymax <- "-84.540844"
+```
+# Pre-procesamiento del Conjunto de Imágenes
+
+
+# Obtención de los Índices de Vegetación
+
+Las coordenadas del bounding box de la imagen están almacenadas en los metadatos del archivo hdf bajo los nombres:
+
+- NORTHBOUNDINGCOORDINATE
+- EASTBOUNDINGCOORDINATE
+- SOUTHBOUNDINGCOORDINATE
+- WESTBOUNDINGCOORDINATE
+
+```{r}
+fl <- "nombre de imagen hdf"
+
+```
