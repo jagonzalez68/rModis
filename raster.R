@@ -1,90 +1,19 @@
----
-title: "R for Geospatial Data"
-author: "Jesus A. Gonzalez"
-date: "29 de julio de 2015"
-output: pdf_document
----
+#install.packages('raster', repos="http://cran.rstudio.com/")
+#install.packages('rgdal', repos="http://cran.rstudio.com/")
+#install.packages('gdalUtils', repos="http://cran.rstudio.com/")
+#install.packages("MODIS", repos="http://R-Forge.R-project.org",type="source")
 
-En este tutorial mostramos el uso del lenguaje de programación R para procesar datos espaciales, en particular, imágenes MODIS.
-
-# Pasos Iniciales
-
-Lo primero que debemos hacer es instalar las siguientes librerías que nos permitirán trabajar con datos espaciales, incluyendo imágenes. La instalación de estos paquetes solo se hará la primera vez que trabajemos con este tipo de datos.
-
-```{r echo=TRUE, message=FALSE, warning=FALSE, eval=FALSE}
-install.packages('raster', repos="http://cran.rstudio.com/")
-install.packages('rgdal', repos="http://cran.rstudio.com/")
-install.packages('gdalUtils', repos="http://cran.rstudio.com/")
-```
-
-Posteriormente, cargaremos las librerías para poder utilizarlas en nuestro programa con los siguientes comandos:
-
-```{r echo=TRUE, message=FALSE, warning=FALSE, eval=FALSE}
 library(knitr)
 library(raster)
 library(rgdal)
 library(gdalUtils)
 library(RCurl)
-```
-
-# Instalación de la Herramienta MRT
-
-La herramienta MODIS Reprojection Tool (MRT) se utiliza para manipular las imágenes MODIS. El código de este tutorial utiliza funciones de MRT y debe descargarse e instalarse. MRT se puede obtener de la siguiente página web: https://lpdaac.usgs.gov/tools/modis_reprojection_tool
-
-# Descarga y Reproyección de Imágenes MODIS
-
-Ahora descargaremos las imágenes MODIS y las reproyectaremos. Los programas que necesitamos son:
-- ModisDownload.R y ModisLP.rdata
-
-Estos archivos los podemos descargar de la página: http://r-gis.net/?q=ModisDownload
-
-Antes de ejecutar el siguiente código necesitamos recolectar la siguiente información:
-- Ruta del directorio de archivos ejecutables de la herramienta MRT
-  - /Users/jagonzalez/MRT/bin
-- Ruta del directorio de datos de la herramienta MRT
-  - /Users/jagonzalez/MRT/data
-- El nombre del producto MODIS que descargaremos
-  - MOD13Q1
-- La posición h/v de los bloques de las imágenes con las que trabajaremos. Para el caso de centroamérica utilizamos:
-  - h = 9
-  - v = 7
-- El rango de fechas para nuestra serie de tiempo de imágenes
-  - Inicial = AAAA.MM.DD
-  - Final = AAAA.MM.DD
-  
-# Continuamos con el procesamiento...
-
-```{r echo=TRUE, message=FALSE, warning = FALSE, eval=FALSE }
 
 Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
 
-# Ruta de binarios del MRT
-MRTPath <- "/Users/jagonzalez/MRT/bin"
-# Ruta donde se almacenan los archivos hdf
-DATPath <- "/Users/jagonzalez/MRT/data/hdf"
-# Ruta donde guardamos el archivo de parámetros
-PARPath <- "/Users/jagonzalez/MRT/par"
-# Ruta de salida, con estructura DOY###
-OUTPath <- "/Users/jagonzalez/MRT/out"
-# Ruta de mi código fuente
-SRCPath <- "/Users/jagonzalez/Documents/R/Geospatial"
-
-# Cambiamos al directorio de código fuente para cargar programa ModisDownload
-setwd(SRCPath)
-
-# Cargamos el programa ModisDownload.R
-source("ModisDownload.R")
-
-# Cambiamos al directorio de nuestros archivos de descarga .hdf
-setwd(DATPath)
-
-# Descargamos las imágenes. Para esto debemos especificar los parámetros:
-# h en h=c(_______)
-# v en v=c(_______)
-# rango de fechas en dates=c('AAAA.MM.DD', 'AAAA.MM.DD')
-ModisDownload(x="MOD13Q1", h=c(9), v=c(7), 
-              dates=c('2015.05.01', '2015.05.21'), 
-              mosaic=F, proj=F,  pixel_size=250)
+MRTPath <- "/Users/jagonzalez/MRT/bin"      # Ruta de binarios del MRT
+DATPath <- "/Users/jagonzalez/MRT/data/hdf" # Ruta donde se almacenan los archivos hdf
+PARPath <- "/Users/jagonzalez/MRT/par"      # Ruta donde guardamos el archivo de parámetros
 
 # Cambiamos al directorio de trabajo, donde se encuentran
 # los archivos de datos de entrada ".hdf"
@@ -183,16 +112,17 @@ system(paste("dos2unix -c mac ", allParFiles, sep = ""))
 # Comando para ejecutar el script mrtbatch
 comando3 <- paste(curDir,"mrtbatch", sep="/")
 system(comando3)
-```
 
-
-# Crear Directorios para cálculo de índice CVI
-```{r}
+# Ahora creamos la estructura de archivos para procesar
+# y calcular el respectivo CVI
+# Los archivos .tif quedaron guardados en PARPath
 TIFPath <- PARPath
 setwd(TIFPath)
+# Obteniendo nombres de archivos NDVI y EVI
 ndvs <- list.files(TIFPath, pattern = "*_NDVI.tif")
 evis <- list.files(TIFPath, pattern = "*_EVI.tif")
 
+# Creando estructura para NDVI's
 # Para cada archivo NDVI descargado
 for(i in seq(1:length(ndvs)))
 {
@@ -206,7 +136,16 @@ for(i in seq(1:length(ndvs)))
   system(comando5)
 }
 
-```
-# Calcular CVI
-
-
+# Creando estructura para EVI's
+# Para cada archivo EVI descargado
+for(i in seq(1:length(evis)))
+{
+  # Obtenemos el nombre del archivo
+  eviDay <- paste("DOY_", substr(evis[i], 14, nchar(evis[i]) - 21), sep="")
+  mvDir <- file.path(OUTPath, eviDay)
+  mvNam <- file.path(TIFPath, evis[i])
+  # Si no se ha creado, creamos el directorio DOY_###
+  dir.create(mvDir, showWarnings = FALSE)
+  comando5 <- paste("cp", mvNam, mvDir, sep=" ")
+  system(comando5)
+}
