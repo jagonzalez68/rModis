@@ -114,6 +114,16 @@ parFile[21] <- " 0.0 0.0 0.0"
 parFile[22] <- " 0.0 0.0 0.0 )"
 parFile[23] <- ""
 parFile[24] <- "DATUM = WGS84"
+fileName <- paste(DATPath, "parameter.par", sep = "/")
+#file.create(fileName)
+#fileConn <- file(fileName)
+sink(fileName)
+for(i in seq(1:length(parFile)))
+{
+  cat(parFile[i])
+  cat("\n")
+}
+sink()
 
 MODISoptions(localArcPath = "/Library/Frameworks/GDAL.framework/Programs/")
 
