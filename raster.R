@@ -4,10 +4,12 @@
 #install.packages("MODIS", repos="http://R-Forge.R-project.org",type="source")
 
 library(raster)
+library(RCurl)
 library(rgdal)
 library(gdalUtils)
-library(RCurl)
+library(MODIS)
 
+# Variable de ambiente para trabajar con MRT
 Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
 
 # Ruta de binarios del MRT
@@ -18,10 +20,25 @@ DATPath <- "/Users/jagonzalez/MRT/data/hdf"
 PARPath <- "/Users/jagonzalez/MRT/par"
 # Ruta de archivos de salida del script
 OUTPath <- "/Users/jagonzalez/MRT/out"
+# Ruta de mi código fuente
+SRCPath <- "/Users/jagonzalez/Documents/R/Geospatial"
+
+# Cambiamos al directorio de código fuente para cargar programa ModisDownload
+# Cargamos el programa ModisDownload.R
+source(file.path(SRCPath, "ModisDownload.R"))
 
 # Cambiamos al directorio de trabajo, donde se encuentran
 # los archivos de datos de entrada ".hdf"
+# inicialmente, aquí descargamos los archivos ".hdf"
 setwd(DATPath)
+
+# Descargamos las imágenes. Para esto debemos especificar los parámetros:
+# h en h=c(_______)
+# v en v=c(_______)
+# rango de fechas en dates=c('AAAA.MM.DD', 'AAAA.MM.DD')
+ModisDownload(x="MOD13Q1", h=c(9), v=c(7), 
+              dates=c('2015.01.01', '2015.08.01'), 
+              mosaic=F, proj=F,  pixel_size=250)
 
 # Obtenemos en filePath la ruta a un archivo hdf para usar en 
 # el archivo de parámetros
@@ -43,20 +60,24 @@ parFile[5] <- ""
 parFile[6] <- "SPATIAL_SUBSET_TYPE = INPUT_LAT_LONG"
 parFile[7] <- ""
 
+# En hdinfo obtenemos los metadatos del archivo .hdf
+# de aquí exraemos las coordenadas del bounding box
+# de las imágenes en el .hdf
 hdinfo <- gdalinfo(filePath, raw_output = TRUE)
 
+# Coordenada Norte
 northC <- hdinfo[grep("NORTHBOUNDINGCOORDINATE", hdinfo)]
 northC <- gsub("NORTHBOUNDINGCOORDINATE=", "", northC)
 northC <- gsub(" ", "", northC)
-
+# Coordenada Este
 eastC  <- hdinfo[grep("EASTBOUNDINGCOORDINATE=", hdinfo)]
 eastC  <- gsub("EASTBOUNDINGCOORDINATE=", "", eastC)
 eastC  <- gsub(" ", "", eastC)
-
+# Coordenada Oeste
 westC  <- hdinfo[grep("WESTBOUNDINGCOORDINATE=", hdinfo)]
 westC  <- gsub("WESTBOUNDINGCOORDINATE=", "", westC)
 westC  <- gsub(" ", "", westC)
-
+# Coordenada Sur
 southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
 southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
 southC  <- gsub(" ", "", southC)
@@ -64,7 +85,7 @@ southC  <- gsub(" ", "", southC)
 parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, ")", sep = " ")
 parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, ")", sep = " ")
 parFile[10] <- ""
-fileName <- substr(fileName, 1, nchar(i) - 4)
+fileName <- substr(fileName, 1, nchar(fileName) - 4)
 fileName <- paste(fileName, "tif", sep=".")
 parFile[11] <- paste("OUTPUT_FILENAME = ", fileName, sep = "" )
 parFile[12] <- ""

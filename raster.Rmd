@@ -7,6 +7,29 @@ output: pdf_document
 
 En este tutorial mostramos el uso del lenguaje de programación R para procesar datos espaciales, en particular, imágenes MODIS.
 
+# Antes de Empezar
+
+Los pasos que debemos hacer antes de correr el programa "raster.R" son:
+- Instalar el software MRT de MODIS, recordar el directorio de ejecutables ".../MRT/bin"
+    - Para definir "MRTPath"
+- Crear los siguientes directorios en algún directorio de su equipo al que tenga acceso
+    - /home/Geospatial                HOMPath
+    - /home/Geospatial/src            SRCPath
+    - /home/Geospatial/dat            
+    - /home/Geospatial/dat/hdf        DATPath
+    - /home/Geospatial/out            OUTPath
+    - /home/Geospatial/out/NDVI
+    - /home/Geospatial/out/EVI
+También es necesario descargar las imágenes MODIS con que vamos a trabajar. Una buena herramienta para hacer esto es "LP DAAC2Disk" que se encuentra en: https://lpdaac.usgs.gov/data_access/data_pool. Se utilizaría un comando como el que sigue:
+Daac2Disk_mac --nometadata --shortname MOD13Q1 
+              --versionid 5 --browse --begin 2015-01-01 
+              --end 2015-02-01 --tile 9 9 7 7 
+              --output /Users/jagonzalez/MRT/data/hdf
+También puede utilizar la interfaz web que encuentra en la página:
+https://lpdaac.usgs.gov/data_access/daac2disk
+
+Los archivos ".hdf" descargados se deben pasar al directorio HDFPath
+
 # Pasos Iniciales
 
 Lo primero que debemos hacer es instalar las siguientes librerías que nos permitirán trabajar con datos espaciales, incluyendo imágenes. La instalación de estos paquetes solo se hará la primera vez que trabajemos con este tipo de datos.
