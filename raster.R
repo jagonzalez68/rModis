@@ -9,172 +9,178 @@ library(rgdal)
 library(gdalUtils)
 library(MODIS)
 
-# Variable de ambiente para trabajar con MRT
-Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
+createParFile <- function(DATPath, PARPath)
+{
+    # Obtenemos en filePath la ruta a un archivo hdf para usar en 
+    # el archivo de parámetros
+    files <- list.files(pattern="*.hdf")
 
-# Ruta de binarios del MRT
-MRTPath <- "/Users/jagonzalez/MRT/bin"
-# Ruta donde se almacenan los archivos hdf
-DATPath <- "/Users/jagonzalez/MRT/data/hdf"
-# Ruta donde guardamos el archivo de parámetros
-PARPath <- "/Users/jagonzalez/MRT/par"
-# Ruta de archivos de salida del script
-OUTPath <- "/Users/jagonzalez/MRT/out"
-# Ruta de mi código fuente
-SRCPath <- "/Users/jagonzalez/Documents/R/Geospatial"
+    fileName <- files[1]
+    filePath <- paste(DATPath, fileName, sep = "/")
 
-# Cambiamos al directorio de código fuente para cargar programa ModisDownload
-# Cargamos el programa ModisDownload.R
-source(file.path(SRCPath, "ModisDownload.R"))
+    # Creación del archivo de parámetros inicial
+    # Si queremos trabajar con un recorte de la imagen original cambiamos:
+    #     - SPATIAL_SUBSET_UL_CORNER
+    #     - SPATIAL_SUBSET_LR_CORNER
+    # a manera que el bounding box contenga nuestro recorte
+    parFile <- vector(mode = "character")
+    parFile[1] <- ""
+    parFile[2] <- paste("INPUT_FILENAME = ", filePath, sep = "")
+    parFile[3] <- ""
+    parFile[4] <- "SPECTRAL_SUBSET = ( 1 1 0 0 0 0 0 0 0 0 0 0 )"
+    parFile[5] <- ""
+    parFile[6] <- "SPATIAL_SUBSET_TYPE = INPUT_LAT_LONG"
+    parFile[7] <- ""
+
+    # En hdinfo obtenemos los metadatos del archivo .hdf
+    # de aquí exraemos las coordenadas del bounding box
+    # de las imágenes en el .hdf
+    hdinfo <- gdalinfo(filePath, raw_output = TRUE)
+
+    # Coordenada Norte
+    northC <- hdinfo[grep("NORTHBOUNDINGCOORDINATE", hdinfo)]
+    northC <- gsub("NORTHBOUNDINGCOORDINATE=", "", northC)
+    northC <- gsub(" ", "", northC)
+    # Coordenada Este
+    eastC  <- hdinfo[grep("EASTBOUNDINGCOORDINATE=", hdinfo)]
+    eastC  <- gsub("EASTBOUNDINGCOORDINATE=", "", eastC)
+    eastC  <- gsub(" ", "", eastC)
+    # Coordenada Oeste
+    westC  <- hdinfo[grep("WESTBOUNDINGCOORDINATE=", hdinfo)]
+    westC  <- gsub("WESTBOUNDINGCOORDINATE=", "", westC)
+    westC  <- gsub(" ", "", westC)
+    # Coordenada Sur
+    southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
+    southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
+    southC  <- gsub(" ", "", southC)
+
+    parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, ")", sep = " ")
+    parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, ")", sep = " ")
+    parFile[10] <- ""
+    fileName <- substr(fileName, 1, nchar(fileName) - 4)
+    fileName <- paste(fileName, "tif", sep=".")
+    parFile[11] <- paste("OUTPUT_FILENAME = ", fileName, sep = "" )
+    parFile[12] <- ""
+    parFile[13] <- "RESAMPLING_TYPE = NEAREST_NEIGHBOR"
+    parFile[14] <- ""
+    parFile[15] <- "OUTPUT_PROJECTION_TYPE = GEO"
+    parFile[16] <- ""
+    parFile[17] <- "OUTPUT_PROJECTION_PARAMETERS = ("
+    parFile[18] <- " 0.0 0.0 0.0"
+    parFile[19] <- " 0.0 0.0 0.0"
+    parFile[20] <- " 0.0 0.0 0.0"
+  
+    parFile[21] <- " 0.0 0.0 0.0"
+    parFile[22] <- " 0.0 0.0 0.0 )"
+    parFile[23] <- ""
+    parFile[24] <- "DATUM = WGS84"
+
+    # Almacenamiento del Archivo de parámetros
+    parFileName <- paste(PARPath, "parameter.par", sep = "/")
+    fileC <- file(parFileName, 'w')
+    for(i in seq(1:length(parFile)))
+    {
+      cat(parFile[i], "\n", file = fileC, sep="")
+    }
+    close(fileC)
+    return(parFileName)
+}
+
+
+
+reproyectarImagenes <- function(parFileName, MRTPath, DATPath, PARPath, OUTPath)
+{
+    # Creamos el comando para preparar la re-proyección:
+    # Se crea el script mrtbatch
+    comando1 <- paste("java -jar ", MRTPath, "/", "MRTBatch.jar -d ", DATPath, " -p ", parFileName, " -o ", OUTPath, sep = "")
+    system(comando1)
+
+    # Comando para agregar permisos de ejecución al
+    # script mrtbatch
+    curDir <- getwd()
+    batchName <- paste(curDir,"mrtbatch", sep="/")
+    comando2 <- paste("chmod 755 ", batchName, sep="")
+    system(comando2)
+
+    # Comando para convertir el archivo de parámetros .par 
+    # de formato mac antiguo a formato unix
+    system(paste("dos2unix -c mac ", batchName, sep=""))
+
+    # Comando para convertir los archivos de parámetros .prm
+    # de formato mac antiguo a formato unix
+    allParFiles <- paste(OUTPath, "*.prm", sep = "/")
+    system(paste("dos2unix -c mac ", allParFiles, sep = ""))
+
+    # Comando para ejecutar el script mrtbatch
+    comando3 <- paste(curDir,"mrtbatch", sep="/")
+    system(comando3)
+
+    # Ahora creamos la estructura de archivos para procesar
+    # y calcular el respectivo CVI
+    # Los archivos .tif quedaron guardados en PARPath
+    TIFPath <- OUTPath
+    setwd(TIFPath)
+    # Obteniendo nombres de archivos NDVI y EVI
+    ndvs <- list.files(TIFPath, pattern = "*_NDVI.tif")
+    evis <- list.files(TIFPath, pattern = "*_EVI.tif")
+
+    # Creando estructura para NDVI's
+    # Para cada archivo NDVI descargado
+    ndviOUTPath <- paste(OUTPath, "NDVI", sep="/")
+    system(paste("mkdir ", ndviOUTPath, sep=""))
+    for(i in seq(1:length(ndvs)))
+    {
+      # Obtenemos el nombre del archivo
+      ndviDay <- paste("DOY_", substr(ndvs[i], 14, nchar(ndvs[i]) - 22), sep="")
+      mvDir <- file.path(ndviOUTPath, ndviDay)
+      mvNam <- file.path(TIFPath, ndvs[i])
+      # Si no se ha creado, creamos el directorio DOY_###
+      dir.create(mvDir, showWarnings = FALSE)
+      comando5 <- paste("mv", mvNam, mvDir, sep=" ")
+      system(comando5)
+    }
+
+    # Creando estructura para EVI's
+    # Para cada archivo EVI descargado
+    eviOUTPath <- paste(OUTPath, "EVI", sep="/")
+    system(paste("mkdir ", eviOUTPath, sep=""))
+    for(i in seq(1:length(evis)))
+    {
+      # Obtenemos el nombre del archivo
+      eviDay <- paste("DOY_", substr(evis[i], 14, nchar(evis[i]) - 21), sep="")
+      mvDir <- file.path(eviOUTPath, eviDay)
+      mvNam <- file.path(TIFPath, evis[i])
+      # Si no se ha creado, creamos el directorio DOY_###
+      dir.create(mvDir, showWarnings = FALSE)
+      comando5 <- paste("mv", mvNam, mvDir, sep=" ")
+      system(comando5)
+    }
+}
+
+
+
+#                           PROGRAMA PRINCIPAL
+
+# INICIA PARTE A MODIFICAR DEL CÓDIGO para cambiar el ambiente de trabajo
+      # Variable de ambiente para trabajar con MRT
+      Sys.setenv(MRT_DATA_DIR = "/Users/jagonzalez/MRT/data")
+      Sys.setenv(MRT_HOME = "/Users/jagonzalez/MRT")
+      Sys.setenv(PATH = "/usr/bin/:/bin:/usr/sbin:/usr/local/bin:/Users/jagonzalez/MRT/bin")
+      # Ruta de binarios del MRT
+      MRTPath <- "/Users/jagonzalez/MRT/bin"
+      # Ruta donde se almacenan los archivos hdf
+      DATPath <- "/Users/jagonzalez/MRT/data/hdf"
+      # Ruta donde guardamos el archivo de parámetros
+      PARPath <- "/Users/jagonzalez/MRT/par"
+      # Ruta de archivos de salida del script
+      OUTPath <- "/Users/jagonzalez/MRT/out"
+      # Ruta de mi código fuente
+      SRCPath <- "/Users/jagonzalez/Documents/R/Geospatial"
+# TERMINA PARTE A MODIFICAR DEL CÓDIGO
 
 # Cambiamos al directorio de trabajo, donde se encuentran
 # los archivos de datos de entrada ".hdf"
 # inicialmente, aquí descargamos los archivos ".hdf"
 setwd(DATPath)
-
-# Descargamos las imágenes. Para esto debemos especificar los parámetros:
-# h en h=c(_______)
-# v en v=c(_______)
-# rango de fechas en dates=c('AAAA.MM.DD', 'AAAA.MM.DD')
-ModisDownload(x="MOD13Q1", h=c(9), v=c(7), 
-              dates=c('2015.01.01', '2015.08.01'), 
-              mosaic=F, proj=F,  pixel_size=250)
-
-# Obtenemos en filePath la ruta a un archivo hdf para usar en 
-# el archivo de parámetros
-files <- list.files(pattern="*.hdf")
-fileName <- files[1]
-filePath <- paste(DATPath, fileName, sep = "/")
-
-# Creación del archivo de parámetros inicial
-# Si queremos trabajar con un recorte de la imagen original cambiamos:
-#     - SPATIAL_SUBSET_UL_CORNER
-#     - SPATIAL_SUBSET_LR_CORNER
-# a manera que el bounding box contenga nuestro recorte
-parFile <- vector(mode = "character")
-parFile[1] <- ""
-parFile[2] <- paste("INPUT_FILENAME = ", filePath, sep = "")
-parFile[3] <- ""
-parFile[4] <- "SPECTRAL_SUBSET = ( 1 1 0 0 0 0 0 0 0 0 0 0 )"
-parFile[5] <- ""
-parFile[6] <- "SPATIAL_SUBSET_TYPE = INPUT_LAT_LONG"
-parFile[7] <- ""
-
-# En hdinfo obtenemos los metadatos del archivo .hdf
-# de aquí exraemos las coordenadas del bounding box
-# de las imágenes en el .hdf
-hdinfo <- gdalinfo(filePath, raw_output = TRUE)
-
-# Coordenada Norte
-northC <- hdinfo[grep("NORTHBOUNDINGCOORDINATE", hdinfo)]
-northC <- gsub("NORTHBOUNDINGCOORDINATE=", "", northC)
-northC <- gsub(" ", "", northC)
-# Coordenada Este
-eastC  <- hdinfo[grep("EASTBOUNDINGCOORDINATE=", hdinfo)]
-eastC  <- gsub("EASTBOUNDINGCOORDINATE=", "", eastC)
-eastC  <- gsub(" ", "", eastC)
-# Coordenada Oeste
-westC  <- hdinfo[grep("WESTBOUNDINGCOORDINATE=", hdinfo)]
-westC  <- gsub("WESTBOUNDINGCOORDINATE=", "", westC)
-westC  <- gsub(" ", "", westC)
-# Coordenada Sur
-southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
-southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
-southC  <- gsub(" ", "", southC)
-
-parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, ")", sep = " ")
-parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, ")", sep = " ")
-parFile[10] <- ""
-fileName <- substr(fileName, 1, nchar(fileName) - 4)
-fileName <- paste(fileName, "tif", sep=".")
-parFile[11] <- paste("OUTPUT_FILENAME = ", fileName, sep = "" )
-parFile[12] <- ""
-parFile[13] <- "RESAMPLING_TYPE = NEAREST_NEIGHBOR"
-parFile[14] <- ""
-parFile[15] <- "OUTPUT_PROJECTION_TYPE = GEO"
-parFile[16] <- ""
-parFile[17] <- "OUTPUT_PROJECTION_PARAMETERS = ("
-parFile[18] <- " 0.0 0.0 0.0"
-parFile[19] <- " 0.0 0.0 0.0"
-parFile[20] <- " 0.0 0.0 0.0"
-parFile[21] <- " 0.0 0.0 0.0"
-parFile[22] <- " 0.0 0.0 0.0 )"
-parFile[23] <- ""
-parFile[24] <- "DATUM = WGS84"
-
-# Almacenamiento del Archivo de parámetros
-parFileName <- paste(PARPath, "parameter.par", sep = "/")
-fileC <- file(parFileName, 'w')
-for(i in seq(1:length(parFile)))
-{
-  cat(parFile[i], "\n", file = fileC, sep="")
-}
-close(fileC)
-# Termina creación del archivo de parámetros inicial
-
-
-# Creamos el comando para preparar la re-proyección:
-# Se crea el script mrtbatch
-comando1 <- paste("java -jar ", MRTPath, "/", "MRTBatch.jar -d ", DATPath, " -p ", parFileName, " -o ", PARPath, sep = "")
-system(comando1)
-
-# Comando para agregar permisos de ejecución al
-# script mrtbatch
-curDir <- getwd()
-batchName <- paste(curDir,"mrtbatch", sep="/")
-comando2 <- paste("chmod 755 ", batchName, sep="")
-system(comando2)
-
-# Comando para convertir el archivo de parámetros .par 
-# de formato mac antiguo a formato unix
-system(paste("dos2unix -c mac ", batchName, sep=""))
-
-# Comando para convertir los archivos de parámetros .prm
-# de formato mac antiguo a formato unix
-allParFiles <- paste(PARPath, "*.prm", sep = "/")
-system(paste("dos2unix -c mac ", allParFiles, sep = ""))
-
-# Comando para ejecutar el script mrtbatch
-comando3 <- paste(curDir,"mrtbatch", sep="/")
-system(comando3)
-
-# Ahora creamos la estructura de archivos para procesar
-# y calcular el respectivo CVI
-# Los archivos .tif quedaron guardados en PARPath
-TIFPath <- PARPath
-setwd(TIFPath)
-# Obteniendo nombres de archivos NDVI y EVI
-ndvs <- list.files(TIFPath, pattern = "*_NDVI.tif")
-evis <- list.files(TIFPath, pattern = "*_EVI.tif")
-
-# Creando estructura para NDVI's
-# Para cada archivo NDVI descargado
-ndviOUTPath <- paste(OUTPath, "NDVI", sep="/")
-system(paste("mkdir ", ndviOUTPath, sep=""))
-for(i in seq(1:length(ndvs)))
-{
-  # Obtenemos el nombre del archivo
-  ndviDay <- paste("DOY_", substr(ndvs[i], 14, nchar(ndvs[i]) - 22), sep="")
-  mvDir <- file.path(ndviOUTPath, ndviDay)
-  mvNam <- file.path(TIFPath, ndvs[i])
-  # Si no se ha creado, creamos el directorio DOY_###
-  dir.create(mvDir, showWarnings = FALSE)
-  comando5 <- paste("cp", mvNam, mvDir, sep=" ")
-  system(comando5)
-}
-
-# Creando estructura para EVI's
-# Para cada archivo EVI descargado
-eviOUTPath <- paste(OUTPath, "EVI", sep="/")
-system(paste("mkdir ", eviOUTPath, sep=""))
-for(i in seq(1:length(evis)))
-{
-  # Obtenemos el nombre del archivo
-  eviDay <- paste("DOY_", substr(evis[i], 14, nchar(evis[i]) - 21), sep="")
-  mvDir <- file.path(eviOUTPath, eviDay)
-  mvNam <- file.path(TIFPath, evis[i])
-  # Si no se ha creado, creamos el directorio DOY_###
-  dir.create(mvDir, showWarnings = FALSE)
-  comando5 <- paste("cp", mvNam, mvDir, sep=" ")
-  system(comando5)
-}
+parFileName <- createParFile(DATPath,PARPath)
+reproyectarImagenes(parFileName, MRTPath, DATPath, PARPath, OUTPath)
