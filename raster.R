@@ -9,7 +9,7 @@ library(rgdal)
 library(gdalUtils)
 library(MODIS)
 
-createParFile <- function(DATPath, PARPath)
+createParFile <- function(DATPath, PARPath, northC="",  westC="", southC="", eastC="")
 {
     # Obtenemos en filePath la ruta a un archivo hdf para usar en 
     # el archivo de parámetros
@@ -38,22 +38,26 @@ createParFile <- function(DATPath, PARPath)
     hdinfo <- gdalinfo(filePath, raw_output = TRUE)
 
     # Coordenada Norte
-    northC <- hdinfo[grep("NORTHBOUNDINGCOORDINATE", hdinfo)]
-    northC <- gsub("NORTHBOUNDINGCOORDINATE=", "", northC)
-    northC <- gsub(" ", "", northC)
-    # Coordenada Este
-    eastC  <- hdinfo[grep("EASTBOUNDINGCOORDINATE=", hdinfo)]
-    eastC  <- gsub("EASTBOUNDINGCOORDINATE=", "", eastC)
-    eastC  <- gsub(" ", "", eastC)
-    # Coordenada Oeste
-    westC  <- hdinfo[grep("WESTBOUNDINGCOORDINATE=", hdinfo)]
-    westC  <- gsub("WESTBOUNDINGCOORDINATE=", "", westC)
-    westC  <- gsub(" ", "", westC)
-    # Coordenada Sur
-    southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
-    southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
-    southC  <- gsub(" ", "", southC)
-
+    if(northC=="")
+    {
+        northC <- hdinfo[grep("NORTHBOUNDINGCOORDINATE", hdinfo)]
+        northC <- gsub("NORTHBOUNDINGCOORDINATE=", "", northC)
+        northC <- gsub(" ", "", northC)
+    
+        # Coordenada Este
+        eastC  <- hdinfo[grep("EASTBOUNDINGCOORDINATE=", hdinfo)]
+        eastC  <- gsub("EASTBOUNDINGCOORDINATE=", "", eastC)
+        eastC  <- gsub(" ", "", eastC)
+        # Coordenada Oeste
+        westC  <- hdinfo[grep("WESTBOUNDINGCOORDINATE=", hdinfo)]
+        westC  <- gsub("WESTBOUNDINGCOORDINATE=", "", westC)
+        westC  <- gsub(" ", "", westC)
+        # Coordenada Sur
+        southC  <- hdinfo[grep("SOUTHBOUNDINGCOORDINATE=", hdinfo)]
+        southC  <- gsub("SOUTHBOUNDINGCOORDINATE=", "", southC)
+        southC  <- gsub(" ", "", southC)
+    }
+    
     parFile[8] <- paste("SPATIAL_SUBSET_UL_CORNER = ( ", northC, westC, ")", sep = " ")
     parFile[9] <- paste("SPATIAL_SUBSET_LR_CORNER = ( ", southC, eastC, ")", sep = " ")
     parFile[10] <- ""
@@ -169,18 +173,27 @@ reproyectarImagenes <- function(parFileName, MRTPath, DATPath, PARPath, OUTPath)
       # Ruta de binarios del MRT
       MRTPath <- "/Users/jagonzalez/MRT/bin"
       # Ruta donde se almacenan los archivos hdf
-      DATPath <- "/Users/jagonzalez/MRT/data/hdf"
+      DATPath <- "/Users/jagonzalez/Documents/R/Geospatial/seco/data/hdf"
       # Ruta donde guardamos el archivo de parámetros
-      PARPath <- "/Users/jagonzalez/MRT/par"
+      PARPath <- "/Users/jagonzalez/Documents/R/Geospatial/seco/par"
       # Ruta de archivos de salida del script
-      OUTPath <- "/Users/jagonzalez/MRT/out"
+      OUTPath <- "/Users/jagonzalez/Documents/R/Geospatial/seco/out"
       # Ruta de mi código fuente
       SRCPath <- "/Users/jagonzalez/Documents/R/Geospatial"
+      
+      # En caso de ser requerido, se pasan las coordenadas del
+      # boundingbox del área a trabajar
+      # UL: -105.61,8.86
+      # LR: -84.67,5.66
+      northC = ""
+      westC = ""
+      southC = ""
+      eastC = ""
 # TERMINA PARTE A MODIFICAR DEL CÓDIGO
 
 # Cambiamos al directorio de trabajo, donde se encuentran
 # los archivos de datos de entrada ".hdf"
 # inicialmente, aquí descargamos los archivos ".hdf"
 setwd(DATPath)
-parFileName <- createParFile(DATPath,PARPath)
+parFileName <- createParFile(DATPath,PARPath, northC, westC, southC, eastC)
 reproyectarImagenes(parFileName, MRTPath, DATPath, PARPath, OUTPath)
